@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>天气日历 · Weather Calendar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-fx" aria-hidden="true">
+    <span class="orb orb-a"></span>
+    <span class="orb orb-b"></span>
+    <span class="orb orb-c"></span>
+    <div class="grid-overlay"></div>
+  </div>
+
+  <div class="app">
+    <header class="app-header glass">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <h1>WEATHER<span>//</span>CALENDAR</h1>
+      </div>
+      <div class="header-sub">STEP 1 — 日历骨架 · 天气数据接入待续</div>
+    </header>
+
+    <nav class="calendar-controls glass">
+      <button id="prev-month" class="nav-btn" aria-label="上个月">
+        <span class="chevron">‹</span>
+      </button>
+      <div class="month-display">
+        <span id="month-label" class="month-label"></span>
+        <span id="year-label" class="year-label"></span>
+      </div>
+      <button id="next-month" class="nav-btn" aria-label="下个月">
+        <span class="chevron">›</span>
+      </button>
+      <button id="today-btn" class="today-btn">TODAY</button>
+    </nav>
+
+    <main class="calendar-wrapper glass">
+      <div class="calendar-grid weekday-row" id="weekday-row"></div>
+      <div class="calendar-grid-viewport">
+        <div class="calendar-grid month-grid" id="calendar-grid"></div>
+      </div>
+    </main>
+
+    <footer class="app-footer">
+      <span class="status-pill">
+        <span class="status-dot"></span>
+        待接入实时天气数据
+      </span>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
