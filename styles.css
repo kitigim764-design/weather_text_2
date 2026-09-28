@@ -737,6 +737,24 @@ body {
   color: var(--muted);
 }
 
+.day-cell.history-fallback {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.history-icon {
+  font-size: 15px;
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+.history-label {
+  margin-top: auto;
+  font-size: 9.5px;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  opacity: 0.7;
+}
+
 /* ---------- footer ---------- */
 
 .app-footer {

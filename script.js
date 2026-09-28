@@ -116,6 +116,7 @@ function renderCalendar(direction) {
 
   const gridStart = new Date(viewYear, viewMonth, 1 - startOffset);
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   const cells = [];
   for (let i = 0; i < totalCells; i++) {
@@ -125,6 +126,7 @@ function renderCalendar(direction) {
       otherMonth: cellDate.getMonth() !== viewMonth,
       isToday: isSameDate(cellDate, today),
       isWeekend: dow === 0 || dow === 6,
+      isPast: cellDate < today,
     }));
   }
 
@@ -138,7 +140,7 @@ function renderCalendar(direction) {
   els.calendarGrid = grid;
 }
 
-function dayCellHtml(day, key, { otherMonth = false, isToday = false, isWeekend = false } = {}) {
+function dayCellHtml(day, key, { otherMonth = false, isToday = false, isWeekend = false, isPast = false } = {}) {
   const classes = ["day-cell"];
   if (otherMonth) classes.push("other-month");
   if (isToday) classes.push("today");
@@ -155,6 +157,15 @@ function dayCellHtml(day, key, { otherMonth = false, isToday = false, isWeekend 
         <span class="temp-max">${Math.round(forecast.max)}°</span>
         <span class="temp-min">${Math.round(forecast.min)}°</span>
       </div>
+    `;
+  } else if (isPast) {
+    // Data source only covers a limited past window (see PAST_DAYS) or the
+    // request hasn't resolved yet — show a dimmed "history unavailable"
+    // marker instead of leaving the cell looking broken/empty.
+    classes.push("history-fallback");
+    weatherHtml = `
+      <div class="day-weather-icon history-icon">🕓</div>
+      <div class="day-weather-temp history-label">历史</div>
     `;
   }
 
@@ -223,12 +234,18 @@ async function geocodeCity(name) {
   };
 }
 
+// How many days of actual (historical) weather to pull alongside the
+// forecast, via Open-Meteo's `past_days` param on the same endpoint — no
+// separate Historical Weather API/key needed. 31 comfortably covers "this
+// month so far" and spills a little into the previous month too.
+const PAST_DAYS = 31;
+
 async function fetchForecast(lat, lon) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
     `&current_weather=true` +
     `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max` +
     `&hourly=temperature_2m,weathercode,relative_humidity_2m,windspeed_10m` +
-    `&timezone=auto&forecast_days=16`;
+    `&timezone=auto&forecast_days=16&past_days=${PAST_DAYS}`;
   let res;
   try {
     res = await fetch(url);
@@ -355,8 +372,13 @@ function openDayDetail(key) {
 
   const forecast = state.daily ? state.daily[key] : null;
   if (!forecast) {
-    els.dmIcon.textContent = "❓";
-    els.dmDesc.textContent = "超出预报范围（最多支持未来 16 天）";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isPast = dateObj < today;
+    els.dmIcon.textContent = isPast ? "🕓" : "❓";
+    els.dmDesc.textContent = isPast
+      ? `历史天气数据暂缺（数据源仅覆盖最近 ${PAST_DAYS} 天）`
+      : "超出预报范围（最多支持未来 16 天）";
     els.dmTemp.textContent = "--";
     els.dmHumidity.textContent = "--";
     els.dmWind.textContent = "--";
