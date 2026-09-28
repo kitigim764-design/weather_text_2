@@ -23,7 +23,7 @@
         <span class="brand-dot"></span>
         <h1>WEATHER<span>//</span>CALENDAR</h1>
       </div>
-      <div class="header-sub">STEP 2 — 实时天气与定位已接入</div>
+      <div class="header-sub">STEP 3 — 逐时预报 · 每日详情 · 日历叠加已接入</div>
     </header>
 
     <section class="weather-panel glass">
@@ -64,6 +64,16 @@
       </div>
     </section>
 
+    <section class="hourly-panel glass">
+      <div class="hourly-panel-header">
+        <span class="panel-eyebrow">HOURLY</span>
+        <h3>24 小时预报</h3>
+      </div>
+      <div class="hourly-scroll" id="hourly-scroll">
+        <div class="hourly-empty" id="hourly-empty">暂无逐时数据</div>
+      </div>
+    </section>
+
     <nav class="calendar-controls glass">
       <button id="prev-month" class="nav-btn" aria-label="上个月">
         <span class="chevron">‹</span>
@@ -88,9 +98,43 @@
     <footer class="app-footer">
       <span class="status-pill">
         <span class="status-dot"></span>
-        数据来源 Open-Meteo · 日历预报叠加待续 (Step 3)
+        数据来源 Open-Meteo · 预报最多覆盖 16 天
       </span>
     </footer>
+  </div>
+
+  <div class="modal-overlay" id="day-modal-overlay" hidden>
+    <div class="day-modal glass" role="dialog" aria-modal="true" aria-labelledby="dm-date">
+      <button type="button" class="modal-close" id="day-modal-close" aria-label="关闭">✕</button>
+
+      <div class="day-modal-header">
+        <div class="day-modal-icon" id="dm-icon"></div>
+        <div>
+          <div class="day-modal-date" id="dm-date"></div>
+          <div class="day-modal-desc" id="dm-desc"></div>
+        </div>
+      </div>
+
+      <div class="day-modal-temp" id="dm-temp"></div>
+
+      <div class="day-modal-stats">
+        <div class="stat-tile">
+          <div class="stat-icon">💧</div>
+          <div class="stat-label">湿度</div>
+          <div class="stat-value" id="dm-humidity">--</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-icon">🌬️</div>
+          <div class="stat-label">风速</div>
+          <div class="stat-value" id="dm-wind">--</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-icon">🌧️</div>
+          <div class="stat-label">降水量</div>
+          <div class="stat-value" id="dm-precip">--</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="script.js"></script>

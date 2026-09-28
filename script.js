@@ -1,8 +1,10 @@
 // Step 1: calendar skeleton. Step 2: current weather + geolocation/city search.
+// Step 3: daily forecast overlay on calendar cells, 24h hourly strip, per-day detail modal.
 // Weather+geocoding data: Open-Meteo (https://open-meteo.com/), free, no API key.
-// Step 3 (daily forecast overlay on calendar cells) comes next.
 
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const WEEKDAYS_CN = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+const MONTHS_EN = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 
 const WEATHER_CODES = {
   0: ["☀️", "晴朗"],
@@ -44,7 +46,10 @@ const state = {
   lat: null,
   lon: null,
   placeName: "",
-  current: null, // { temp, code, wind, time }
+  current: null,      // { temp, code, wind, time }
+  daily: null,        // { 'YYYY-MM-DD': { code, max, min, precip, windMax } }
+  hourly: null,        // [{ time, temp, code, humidity, wind }, ...] sorted ascending
+  selectedDate: null,  // 'YYYY-MM-DD' currently shown in the detail modal
 };
 
 const els = {
@@ -52,6 +57,7 @@ const els = {
   yearLabel: document.getElementById("year-label"),
   weekdayRow: document.getElementById("weekday-row"),
   calendarGrid: document.getElementById("calendar-grid"),
+  calendarViewport: document.querySelector(".calendar-grid-viewport"),
   prevBtn: document.getElementById("prev-month"),
   nextBtn: document.getElementById("next-month"),
   todayBtn: document.getElementById("today-btn"),
@@ -68,55 +74,58 @@ const els = {
   cwPlace: document.getElementById("cw-place"),
   cwWind: document.getElementById("cw-wind"),
   cwUpdated: document.getElementById("cw-updated"),
+
+  hourlyScroll: document.getElementById("hourly-scroll"),
+  hourlyEmpty: document.getElementById("hourly-empty"),
+
+  dayModalOverlay: document.getElementById("day-modal-overlay"),
+  dayModalClose: document.getElementById("day-modal-close"),
+  dmIcon: document.getElementById("dm-icon"),
+  dmDate: document.getElementById("dm-date"),
+  dmDesc: document.getElementById("dm-desc"),
+  dmTemp: document.getElementById("dm-temp"),
+  dmHumidity: document.getElementById("dm-humidity"),
+  dmWind: document.getElementById("dm-wind"),
+  dmPrecip: document.getElementById("dm-precip"),
 };
 
 function pad(n) { return String(n).padStart(2, "0"); }
+function dateKey(y, m, d) { return `${y}-${pad(m + 1)}-${pad(d)}`; }
+function isSameDate(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
 
 function renderWeekdayRow() {
   els.weekdayRow.innerHTML = WEEKDAYS.map((w) => `<div>${w}</div>`).join("");
 }
 
+// ---------- calendar grid ----------
+
 function renderCalendar(direction) {
   const { viewYear, viewMonth } = state;
 
-  els.monthLabel.textContent = String(viewMonth + 1).padStart(2, "0") + " / " +
-    ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"][viewMonth];
+  els.monthLabel.textContent = String(viewMonth + 1).padStart(2, "0") + " / " + MONTHS_EN[viewMonth];
   els.yearLabel.textContent = String(viewYear);
 
   const firstDay = new Date(viewYear, viewMonth, 1);
   const startOffset = firstDay.getDay(); // 0 = Sun
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+  const remainder = (startOffset + daysInMonth) % 7;
+  const trailing = remainder === 0 ? 0 : 7 - remainder;
+  const totalCells = startOffset + daysInMonth + trailing;
 
+  const gridStart = new Date(viewYear, viewMonth, 1 - startOffset);
   const today = new Date();
-  const isCurrentMonth = today.getFullYear() === viewYear && today.getMonth() === viewMonth;
 
   const cells = [];
-
-  // leading days from previous month (visual continuity, muted)
-  for (let i = startOffset - 1; i >= 0; i--) {
-    const d = daysInPrevMonth - i;
-    cells.push(dayCellHtml(d, { otherMonth: true }));
-  }
-
-  // current month days
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dow = new Date(viewYear, viewMonth, day).getDay();
-    const isToday = isCurrentMonth && today.getDate() === day;
-    cells.push(dayCellHtml(day, {
-      isToday,
+  for (let i = 0; i < totalCells; i++) {
+    const cellDate = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+    const dow = cellDate.getDay();
+    cells.push(dayCellHtml(cellDate.getDate(), dateKey(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate()), {
+      otherMonth: cellDate.getMonth() !== viewMonth,
+      isToday: isSameDate(cellDate, today),
       isWeekend: dow === 0 || dow === 6,
     }));
-  }
-
-  // trailing days from next month to fill the last row
-  const totalCells = cells.length;
-  const remainder = totalCells % 7;
-  if (remainder !== 0) {
-    const trailing = 7 - remainder;
-    for (let d = 1; d <= trailing; d++) {
-      cells.push(dayCellHtml(d, { otherMonth: true }));
-    }
   }
 
   // rebuild grid with a transition class so month changes feel animated
@@ -129,16 +138,30 @@ function renderCalendar(direction) {
   els.calendarGrid = grid;
 }
 
-function dayCellHtml(day, { otherMonth = false, isToday = false, isWeekend = false } = {}) {
+function dayCellHtml(day, key, { otherMonth = false, isToday = false, isWeekend = false } = {}) {
   const classes = ["day-cell"];
   if (otherMonth) classes.push("other-month");
   if (isToday) classes.push("today");
   if (isWeekend) classes.push("weekend");
+  if (key === state.selectedDate) classes.push("selected");
+
+  const forecast = state.daily ? state.daily[key] : null;
+  let weatherHtml = '<div class="day-weather-placeholder"></div>';
+  if (forecast) {
+    classes.push("has-weather");
+    weatherHtml = `
+      <div class="day-weather-icon">${weatherIcon(forecast.code)}</div>
+      <div class="day-weather-temp">
+        <span class="temp-max">${Math.round(forecast.max)}°</span>
+        <span class="temp-min">${Math.round(forecast.min)}°</span>
+      </div>
+    `;
+  }
 
   return `
-    <div class="${classes.join(" ")}">
+    <div class="${classes.join(" ")}" data-date="${key}">
       <div class="day-num">${day}</div>
-      <div class="day-weather-placeholder"></div>
+      ${weatherHtml}
     </div>
   `;
 }
@@ -165,10 +188,18 @@ els.prevBtn.addEventListener("click", () => changeMonth(-1));
 els.nextBtn.addEventListener("click", () => changeMonth(1));
 els.todayBtn.addEventListener("click", goToToday);
 
+// clicking any day cell opens its detail modal; delegated on the viewport
+// wrapper since #calendar-grid itself gets replaced on every render.
+els.calendarViewport.addEventListener("click", (e) => {
+  const cell = e.target.closest(".day-cell[data-date]");
+  if (!cell) return;
+  openDayDetail(cell.dataset.date);
+});
+
 renderWeekdayRow();
 renderCalendar();
 
-// ---------- Step 2: weather + geolocation/search ----------
+// ---------- weather + geolocation/search ----------
 
 async function geocodeCity(name) {
   const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=zh`;
@@ -192,13 +223,17 @@ async function geocodeCity(name) {
   };
 }
 
-async function fetchCurrentWeather(lat, lon) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`;
+async function fetchForecast(lat, lon) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&current_weather=true` +
+    `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max` +
+    `&hourly=temperature_2m,weathercode,relative_humidity_2m,windspeed_10m` +
+    `&timezone=auto&forecast_days=16`;
   let res;
   try {
     res = await fetch(url);
   } catch (networkErr) {
-    console.error("fetchCurrentWeather network error:", networkErr);
+    console.error("fetchForecast network error:", networkErr);
     throw new Error("天气数据请求失败（网络错误）。若通过双击文件直接打开页面，请改用本地服务器（如 `python -m http.server`）后用 http://localhost 访问");
   }
   if (!res.ok) throw new Error(`天气数据请求失败 (HTTP ${res.status})`);
@@ -264,22 +299,149 @@ function renderCurrentWeather() {
   });
 }
 
+// ---------- hourly strip ----------
+
+function renderHourlyStrip() {
+  if (!state.hourly || state.hourly.length === 0) {
+    els.hourlyEmpty.hidden = false;
+    return;
+  }
+  els.hourlyEmpty.hidden = true;
+
+  const now = new Date();
+  const nowKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:00`;
+  let startIdx = state.hourly.findIndex((h) => h.time >= nowKey);
+  if (startIdx === -1) startIdx = 0;
+
+  const slice = state.hourly.slice(startIdx, startIdx + 24);
+  els.hourlyScroll.innerHTML = slice.map((h, idx) => {
+    const d = new Date(h.time);
+    const label = idx === 0 ? "现在" : `${pad(d.getHours())}:00`;
+    return `
+      <div class="hour-card${idx === 0 ? " now" : ""}">
+        <div class="hour-time">${label}</div>
+        <div class="hour-icon">${weatherIcon(h.code)}</div>
+        <div class="hour-temp">${Math.round(h.temp)}°</div>
+      </div>
+    `;
+  }).join("");
+}
+
+// ---------- day detail modal ----------
+
+function parseDateKey(key) {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function formatDateHuman(date) {
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${WEEKDAYS_CN[date.getDay()]}`;
+}
+
+function computeAvgHumidity(key) {
+  if (!state.hourly) return null;
+  const entries = state.hourly.filter((h) => h.time.startsWith(key));
+  if (entries.length === 0) return null;
+  const sum = entries.reduce((acc, h) => acc + h.humidity, 0);
+  return Math.round(sum / entries.length);
+}
+
+function openDayDetail(key) {
+  state.selectedDate = key;
+  renderCalendar(); // re-render so the clicked cell shows the "selected" ring
+
+  const dateObj = parseDateKey(key);
+  els.dmDate.textContent = formatDateHuman(dateObj);
+
+  const forecast = state.daily ? state.daily[key] : null;
+  if (!forecast) {
+    els.dmIcon.textContent = "❓";
+    els.dmDesc.textContent = "超出预报范围（最多支持未来 16 天）";
+    els.dmTemp.textContent = "--";
+    els.dmHumidity.textContent = "--";
+    els.dmWind.textContent = "--";
+    els.dmPrecip.textContent = "--";
+  } else {
+    els.dmIcon.textContent = weatherIcon(forecast.code);
+    els.dmDesc.textContent = weatherDesc(forecast.code);
+    els.dmTemp.textContent = `${Math.round(forecast.max)}° / ${Math.round(forecast.min)}°`;
+
+    const humidity = computeAvgHumidity(key);
+    els.dmHumidity.textContent = humidity != null ? `${humidity}%` : "--";
+    els.dmWind.textContent = forecast.windMax != null ? `${Math.round(forecast.windMax)} km/h` : "--";
+    els.dmPrecip.textContent = forecast.precip != null ? `${forecast.precip.toFixed(1)} mm` : "--";
+  }
+
+  els.dayModalOverlay.hidden = false;
+}
+
+function closeDayDetail() {
+  els.dayModalOverlay.hidden = true;
+}
+
+els.dayModalClose.addEventListener("click", closeDayDetail);
+els.dayModalOverlay.addEventListener("click", (e) => {
+  if (e.target === els.dayModalOverlay) closeDayDetail();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !els.dayModalOverlay.hidden) closeDayDetail();
+});
+
+// ---------- orchestration ----------
+
 async function loadWeatherFor(lat, lon, placeName) {
   setWeatherLoading();
   try {
-    const data = await fetchCurrentWeather(lat, lon);
+    const data = await fetchForecast(lat, lon);
     state.lat = lat;
     state.lon = lon;
     state.placeName = placeName || `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+
     state.current = {
       temp: data.current_weather.temperature,
       code: data.current_weather.weathercode,
       wind: data.current_weather.windspeed,
       time: data.current_weather.time,
     };
+
+    state.daily = {};
+    const d = data.daily;
+    for (let i = 0; i < d.time.length; i++) {
+      state.daily[d.time[i]] = {
+        code: d.weathercode[i],
+        max: d.temperature_2m_max[i],
+        min: d.temperature_2m_min[i],
+        precip: d.precipitation_sum ? d.precipitation_sum[i] : null,
+        windMax: d.windspeed_10m_max ? d.windspeed_10m_max[i] : null,
+      };
+    }
+
+    const h = data.hourly;
+    state.hourly = h.time.map((t, i) => ({
+      time: t,
+      temp: h.temperature_2m[i],
+      code: h.weathercode[i],
+      humidity: h.relative_humidity_2m[i],
+      wind: h.windspeed_10m[i],
+    }));
+
+    state.selectedDate = null;
+    if (!els.dayModalOverlay.hidden) closeDayDetail();
+
     renderCurrentWeather();
+    renderHourlyStrip();
+    renderCalendar();
   } catch (err) {
     setWeatherError(err.message || "获取天气失败");
+  }
+}
+
+async function loadDefaultCity() {
+  try {
+    const loc = await geocodeCity("Seoul");
+    await loadWeatherFor(loc.lat, loc.lon, loc.name);
+  } catch (err) {
+    setWeatherError(err.message || "获取默认城市天气失败");
   }
 }
 
@@ -296,15 +458,6 @@ els.searchForm.addEventListener("submit", async (e) => {
   }
 });
 
-async function loadDefaultCity() {
-  try {
-    const loc = await geocodeCity("Seoul");
-    await loadWeatherFor(loc.lat, loc.lon, loc.name);
-  } catch (err) {
-    setWeatherError(err.message || "获取默认城市天气失败");
-  }
-}
-
 els.locateBtn.addEventListener("click", async () => {
   setWeatherLoading();
   const pos = await getPositionSafe(10000);
@@ -318,7 +471,7 @@ els.locateBtn.addEventListener("click", async () => {
 
 // Initial load: try geolocation; on any failure (denied, unsupported, times
 // out, insecure context, etc.) fall back to showing Seoul's weather so the
-// panel is never left blank.
+// panel and calendar are never left blank.
 (async () => {
   setWeatherLoading();
   const pos = await getPositionSafe(8000);
