@@ -172,8 +172,14 @@ renderCalendar();
 
 async function geocodeCity(name) {
   const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=zh`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("地理编码请求失败");
+  let res;
+  try {
+    res = await fetch(url);
+  } catch (networkErr) {
+    console.error("geocodeCity network error:", networkErr);
+    throw new Error("地理编码请求失败（网络错误）。若通过双击文件直接打开页面，请改用本地服务器（如 `python -m http.server`）后用 http://localhost 访问");
+  }
+  if (!res.ok) throw new Error(`地理编码请求失败 (HTTP ${res.status})`);
   const data = await res.json();
   if (!data.results || data.results.length === 0) {
     throw new Error(`未找到城市 "${name}"`);
@@ -188,9 +194,45 @@ async function geocodeCity(name) {
 
 async function fetchCurrentWeather(lat, lon) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("天气数据请求失败");
+  let res;
+  try {
+    res = await fetch(url);
+  } catch (networkErr) {
+    console.error("fetchCurrentWeather network error:", networkErr);
+    throw new Error("天气数据请求失败（网络错误）。若通过双击文件直接打开页面，请改用本地服务器（如 `python -m http.server`）后用 http://localhost 访问");
+  }
+  if (!res.ok) throw new Error(`天气数据请求失败 (HTTP ${res.status})`);
   return res.json();
+}
+
+// Wraps navigator.geolocation.getCurrentPosition in a Promise with a hard
+// timeout, and never rejects — resolves to `null` on any failure so callers
+// can always fall back to a default city instead of hanging forever.
+function getPositionSafe(timeoutMs = 6000) {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+    let settled = false;
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const hardTimeout = setTimeout(() => done(null), timeoutMs);
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { clearTimeout(hardTimeout); done(pos); },
+        (err) => { clearTimeout(hardTimeout); console.warn("geolocation error:", err); done(null); },
+        { timeout: timeoutMs }
+      );
+    } catch (err) {
+      console.warn("geolocation threw synchronously:", err);
+      clearTimeout(hardTimeout);
+      done(null);
+    }
+  });
 }
 
 function setWeatherLoading() {
@@ -254,33 +296,35 @@ els.searchForm.addEventListener("submit", async (e) => {
   }
 });
 
-els.locateBtn.addEventListener("click", () => {
-  if (!navigator.geolocation) {
-    setWeatherError("当前浏览器不支持定位");
-    return;
+async function loadDefaultCity() {
+  try {
+    const loc = await geocodeCity("Seoul");
+    await loadWeatherFor(loc.lat, loc.lon, loc.name);
+  } catch (err) {
+    setWeatherError(err.message || "获取默认城市天气失败");
   }
+}
+
+els.locateBtn.addEventListener("click", async () => {
   setWeatherLoading();
-  navigator.geolocation.getCurrentPosition(
-    (pos) => loadWeatherFor(pos.coords.latitude, pos.coords.longitude, "当前位置"),
-    () => setWeatherError("无法获取位置，请手动搜索城市"),
-    { timeout: 10000 }
-  );
+  const pos = await getPositionSafe(10000);
+  if (pos) {
+    await loadWeatherFor(pos.coords.latitude, pos.coords.longitude, "当前位置");
+  } else {
+    // Geolocation denied/unavailable/timed out — always fall back to Seoul.
+    await loadDefaultCity();
+  }
 });
 
-// Initial load: try geolocation, fall back to a default city.
-if (navigator.geolocation) {
+// Initial load: try geolocation; on any failure (denied, unsupported, times
+// out, insecure context, etc.) fall back to showing Seoul's weather so the
+// panel is never left blank.
+(async () => {
   setWeatherLoading();
-  navigator.geolocation.getCurrentPosition(
-    (pos) => loadWeatherFor(pos.coords.latitude, pos.coords.longitude, "当前位置"),
-    () => {
-      geocodeCity("Seoul")
-        .then((loc) => loadWeatherFor(loc.lat, loc.lon, loc.name))
-        .catch((err) => setWeatherError(err.message));
-    },
-    { timeout: 8000 }
-  );
-} else {
-  geocodeCity("Seoul")
-    .then((loc) => loadWeatherFor(loc.lat, loc.lon, loc.name))
-    .catch((err) => setWeatherError(err.message));
-}
+  const pos = await getPositionSafe(8000);
+  if (pos) {
+    await loadWeatherFor(pos.coords.latitude, pos.coords.longitude, "当前位置");
+  } else {
+    await loadDefaultCity();
+  }
+})();
