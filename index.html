@@ -23,8 +23,46 @@
         <span class="brand-dot"></span>
         <h1>WEATHER<span>//</span>CALENDAR</h1>
       </div>
-      <div class="header-sub">STEP 1 — 日历骨架 · 天气数据接入待续</div>
+      <div class="header-sub">STEP 2 — 实时天气与定位已接入</div>
     </header>
+
+    <section class="weather-panel glass">
+      <form id="search-form" class="search-form">
+        <div class="search-field">
+          <span class="search-icon">◎</span>
+          <input id="city-input" type="text" placeholder="搜索城市 e.g. Seoul / Shanghai" autocomplete="off" />
+        </div>
+        <button type="submit" class="ghost-btn">搜索</button>
+        <button type="button" id="locate-btn" class="ghost-btn locate-btn">
+          <span class="locate-icon">◈</span> 定位
+        </button>
+      </form>
+
+      <div id="weather-display" class="weather-display is-loading">
+        <div class="weather-skeleton">
+          <div class="sk-icon"></div>
+          <div class="sk-lines">
+            <div class="sk-line sk-line-lg"></div>
+            <div class="sk-line sk-line-sm"></div>
+          </div>
+        </div>
+
+        <div class="weather-content" hidden>
+          <div class="weather-icon" id="cw-icon"></div>
+          <div class="weather-main">
+            <div class="weather-temp" id="cw-temp"></div>
+            <div class="weather-desc" id="cw-desc"></div>
+            <div class="weather-place" id="cw-place"></div>
+          </div>
+          <div class="weather-meta">
+            <div><span class="meta-label">风速</span><span id="cw-wind">--</span> km/h</div>
+            <div><span class="meta-label">更新</span><span id="cw-updated">--</span></div>
+          </div>
+        </div>
+
+        <div class="weather-error" id="weather-error" hidden></div>
+      </div>
+    </section>
 
     <nav class="calendar-controls glass">
       <button id="prev-month" class="nav-btn" aria-label="上个月">
@@ -50,7 +88,7 @@
     <footer class="app-footer">
       <span class="status-pill">
         <span class="status-dot"></span>
-        待接入实时天气数据
+        数据来源 Open-Meteo · 日历预报叠加待续 (Step 3)
       </span>
     </footer>
   </div>

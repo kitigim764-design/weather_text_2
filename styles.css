@@ -177,6 +177,205 @@ body {
   padding-left: 20px;
 }
 
+/* ---------- weather panel ---------- */
+
+.weather-panel {
+  padding: 18px 20px;
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.search-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.search-field {
+  flex: 1 1 220px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border-glass);
+  background: rgba(255, 255, 255, 0.03);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-field:focus-within {
+  border-color: var(--border-glow);
+  box-shadow: 0 0 16px rgba(94, 231, 255, 0.25);
+}
+
+.search-icon {
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.search-field input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 0;
+  outline: none;
+}
+
+.search-field input::placeholder {
+  color: var(--muted);
+}
+
+.ghost-btn {
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border-glass);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.22s ease;
+  white-space: nowrap;
+}
+
+.ghost-btn:hover {
+  border-color: var(--border-glow);
+  color: var(--accent);
+  box-shadow: 0 0 14px rgba(94, 231, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.locate-icon {
+  color: var(--accent-3);
+}
+
+.weather-display {
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+}
+
+/* skeleton loading state */
+
+.weather-skeleton {
+  display: none;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+}
+
+.weather-display.is-loading .weather-skeleton {
+  display: flex;
+}
+
+.sk-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.10) 37%, rgba(255,255,255,0.04) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+.sk-lines {
+  flex: 1;
+  display: grid;
+  gap: 10px;
+}
+
+.sk-line {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.10) 37%, rgba(255,255,255,0.04) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+.sk-line-lg { width: 45%; height: 20px; }
+.sk-line-sm { width: 30%; }
+
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* live weather content */
+
+.weather-content {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  width: 100%;
+  animation: gridIn 0.35s ease;
+}
+
+.weather-icon {
+  font-size: 52px;
+  line-height: 1;
+  filter: drop-shadow(0 0 14px rgba(94, 231, 255, 0.35));
+}
+
+.weather-main {
+  min-width: 150px;
+}
+
+.weather-temp {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 700;
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  line-height: 1.1;
+}
+
+.weather-desc {
+  color: var(--text);
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.weather-place {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+  letter-spacing: 0.3px;
+}
+
+.weather-meta {
+  margin-left: auto;
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.meta-label {
+  display: inline-block;
+  min-width: 40px;
+  color: var(--accent);
+  margin-right: 6px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+
+.weather-error {
+  color: var(--accent-3);
+  font-size: 13px;
+  letter-spacing: 0.3px;
+}
+
 /* ---------- calendar controls ---------- */
 
 .calendar-controls {
@@ -412,7 +611,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .orb, .brand-dot, .status-dot, .day-cell.today, .month-grid {
+  .orb, .brand-dot, .status-dot, .day-cell.today, .month-grid, .sk-icon, .sk-line, .weather-content {
     animation: none !important;
   }
   .day-cell { transition: none; }
